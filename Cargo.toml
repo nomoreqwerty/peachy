@@ -2,6 +2,8 @@
 name = "peachy"
 authors = ["nomoreqwerty <vlaadiolus@gmail.com>"]
 version = "1.0.0"
+repository = "https://github.com/nomoreqwerty/peachy"
+homepage = "https://github.com/nomoreqwerty/peachy"
 edition = "2021"
 license = "MIT"
 description = "Peachy is a simple async task manager, similar to thread pool but cooler and for structs"
