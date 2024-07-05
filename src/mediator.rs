@@ -25,10 +25,10 @@ use crate::routines::Routine;
 ///     Manager::new()
 ///         .add_routine(SenderRoutine { con: mediator.connect(AppRoute::SenderRoutine).await })
 ///         .add_routine(ReceiverRoutine { con: mediator.connect(AppRoute::ReceiverRoutine).await })
-///         .add_routine(mediator)
+///         .add_routine(mediator) // should be added after all connections
 ///         .run()
 ///         .await?;
-/// 
+///
 ///     Ok(())
 /// }
 ///
