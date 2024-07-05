@@ -4,6 +4,7 @@ authors = ["nomoreqwerty <vlaadiolus@gmail.com>"]
 version = "1.0.0"
 edition = "2021"
 license = "MIT"
+description = "Peachy is a simple async task manager, similar to thread pool but cooler and for structs"
 
 [dependencies]
 tokio = { version = "1.38.0", features = ["rt-multi-thread", "macros", "sync"] }
