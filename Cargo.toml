@@ -1,7 +1,10 @@
 [package]
 name = "peachy"
-version = "0.1.0"
+authors = ["Vladislav Gavrilov <vlaadiolus@gmail.com>"]
+version = "1.1.0"
 edition = "2021"
+license = "MIT"
+description = "An asynchronous task manager, similar to thread pool but cooler and for structs"
 
 [dependencies]
 tokio = { version = "1.38.0", features = ["rt-multi-thread", "macros", "sync"] }
