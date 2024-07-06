@@ -35,7 +35,6 @@ pub type ManagerResult = Result<(), ManagerError>;
 pub struct Manager {
     idle_routines: Vec<IdleRoutine>,
     running_routines: Vec<JoinHandle<ManagerResult>>,
-    tracing_span: tracing::Span,
 }
 
 impl Manager {
@@ -43,7 +42,6 @@ impl Manager {
         Self {
             idle_routines: vec![],
             running_routines: vec![],
-            tracing_span: tracing::error_span!("Manager"),
         }
     }
 
@@ -56,7 +54,6 @@ impl Manager {
     async fn run_routines(&mut self) -> anyhow::Result<()> {
         self.idle_routines.reverse();
         for idle_routine in self.idle_routines.drain(..) {
-            self.tracing_span.in_scope(|| tracing::debug!("running {}", idle_routine.name));
             self.running_routines.push(tokio::spawn(Box::into_pin(idle_routine.handle)));
         }
 
@@ -65,8 +62,6 @@ impl Manager {
 
     #[inline]
     async fn join_routines(&mut self) -> ManagerResult {
-        self.tracing_span.in_scope(|| tracing::trace!("joining"));
-        
         for worker in self.running_routines.drain(..) {
             worker.await.map_err(ManagerError::RuntimeError)??;
         }

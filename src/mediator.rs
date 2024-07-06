@@ -77,7 +77,6 @@ where E: Debug + Clone + Hash + PartialEq + Eq + Send + Sync + 'static,
       M: Clone + PartialEq + Send + Sync + 'static
 {
     connectors: Arc<DashMap<E, Connector<E, M>>>,
-    tracing_span: tracing::Span,
 }
 
 impl<E, M> Routine for Mediator<E, M>
@@ -106,13 +105,10 @@ impl<E, M> Mediator<E, M>
     pub fn new() -> Self {
         Self {
             connectors: Arc::new(DashMap::new()),
-            tracing_span: tracing::error_span!("Mediator"),
         }
     }
 
     async fn redirect(& self, to: E, message: M) -> ManagerResult {
-        self.tracing_span.in_scope(|| tracing::trace!("redirecting message to {:?}", to));
-
         let connector = self.connectors.get_mut(&to).unwrap();
 
         connector
@@ -125,8 +121,6 @@ impl<E, M> Mediator<E, M>
     }
     
     pub async fn connect(&self, source: E) -> Connector<E, M> {
-        self.tracing_span.in_scope(|| tracing::trace!("{:?} connected", source));
-
         let (mediator_to_connector, connector_from_mediator) = tokio::sync::mpsc::channel(32);
         let (connector_to_mediator, mediator_from_connector) = tokio::sync::mpsc::channel(32);
 
@@ -135,13 +129,11 @@ impl<E, M> Mediator<E, M>
             .insert(source.clone(), Connector {
                 tx: mediator_to_connector,
                 rx: mediator_from_connector,
-                tracing_span: tracing::debug_span!("Connector on Mediator", source = ?source),
             });
 
         Connector {
             tx: connector_to_mediator,
             rx: connector_from_mediator,
-            tracing_span: tracing::debug_span!("Connector on Routine", source = ?source),
         }
     }
 }
@@ -159,7 +151,6 @@ pub struct Connector<E, M>
 {
     tx: Sender<MessagePoint<E, M>>,
     rx: Receiver<MessagePoint<E, M>>,
-    tracing_span: tracing::Span,
 }
 
 impl<E, M> Connector<E, M>
@@ -168,8 +159,6 @@ impl<E, M> Connector<E, M>
 {
     #[inline]
     pub async fn send(&mut self, dest: E, msg: M) -> ManagerResult {
-        self.tracing_span.in_scope(|| tracing::debug!("sending message to {:?}", dest));
-
         self
             .tx
             .send(MessagePoint { destination: dest, message: msg })
@@ -181,8 +170,6 @@ impl<E, M> Connector<E, M>
 
     #[inline]
     pub async fn recv(&mut self) -> Option<M> {
-        self.tracing_span.in_scope(|| tracing::debug!("waiting for a message"));
-
         self.rx.recv().await.map(|MessagePoint { destination: _, message }| message)
     }
 }
