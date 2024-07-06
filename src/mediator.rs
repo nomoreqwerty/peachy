@@ -94,8 +94,6 @@ impl<E, M> Routine for Mediator<E, M>
             }
         }
     }
-
-    fn name(&self) -> &'static str { "Mediator" }
 }
 
 impl<E, M> Mediator<E, M>

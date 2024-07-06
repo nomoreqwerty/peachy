@@ -16,12 +16,5 @@ pub trait Routine {
     /// }
     /// ```
     /// 
-    fn run(self) -> impl Future<Output = ManagerResult> + Send + Sync + 'static;
-    
-    /// The name of the routine.
-    /// 
-    /// Default is set to "Unnamed"
-    /// 
-    /// It is needed for `tracing` to identify the routine in logs if you ever need it
-    fn name(&self) -> &'static str { "Unnamed" }
+    fn run(self) -> impl Future<Output = ManagerResult> + Send + 'static;
 }

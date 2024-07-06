@@ -54,7 +54,7 @@ impl Manager {
     async fn run_routines(&mut self) -> anyhow::Result<()> {
         self.idle_routines.reverse();
         for idle_routine in self.idle_routines.drain(..) {
-            self.running_routines.push(tokio::spawn(Box::into_pin(idle_routine.handle)));
+            self.running_routines.push(tokio::spawn(Box::into_pin(idle_routine.0)));
         }
 
         Ok(())
@@ -99,16 +99,10 @@ pub enum ManagerError {
     RoutineError(anyhow::Error),
 }
 
-struct IdleRoutine {
-    name: &'static str,
-    handle: Box<dyn Future<Output = ManagerResult> + Send>,
-}
+struct IdleRoutine(Box<dyn Future<Output = ManagerResult> + Send>);
 
 impl IdleRoutine {
     fn new(routine: impl Routine) -> Self {
-        Self {
-            name: routine.name(),
-            handle: Box::new(routine.run()),
-        }
+        Self(Box::new(routine.run()))
     }
 }
