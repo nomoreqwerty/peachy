@@ -10,9 +10,6 @@ description = "Peachy is a simple async task manager, similar to thread pool but
 
 [dependencies]
 tokio = { version = "1.38.0", features = ["rt-multi-thread", "macros", "sync"] }
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 thiserror = "1.0.61"
-derive-getters = "0.4.0"
 anyhow = "1.0.82"
 dashmap = "6.0.1"
