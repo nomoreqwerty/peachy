@@ -37,7 +37,8 @@ use crate::routines::Routine;
 /// }
 ///
 /// impl Routine for SenderRoutine {
-///     async fn run(mut self) -> ManagerResult {
+///
+///     async fn run(mut self) -> Result<(), Self::Err> {
 ///         self.con.send(AppRoute::ReceiverRoutine, AppEvent::ReceiverRoutine(ReceiverRoutineEvent::Print("Hello, World!".to_string()))).await?;
 ///         Ok(())
 ///     }
@@ -48,7 +49,8 @@ use crate::routines::Routine;
 /// }
 ///
 /// impl Routine for ReceiverRoutine {
-///     async fn run(mut self) -> ManagerResult {
+///
+///     async fn run(mut self) -> Result<(), Self::Err> {
 ///         if let AppEvent::ReceiverRoutine(ReceiverRoutineEvent::Print(text)) = self.con.recv().await.unwrap() {
 ///             println!("{}", text);
 ///         }
@@ -83,7 +85,8 @@ impl<E, M> Routine for Mediator<E, M>
     where E: Debug + Clone + Hash + PartialEq + Eq + Send + Sync + 'static,
           M: Clone + PartialEq + Send + Sync + 'static
 {
-    async fn run(self) -> ManagerResult {
+    
+    async fn run(self) -> Result<(), Self::Err> {   
         loop {
             for mut connector in self.connectors.iter_mut() {
                 match connector.value_mut().rx.try_recv() {
@@ -156,8 +159,8 @@ pub struct Connector<E, M>
 }
 
 impl<E, M> Connector<E, M>
-    where E: Debug + Send + Sync + 'static,
-          M: Send + Sync + 'static
+    where E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
+          M: Clone + PartialEq + Send + Sync + 'static
 {
     #[inline]
     pub async fn send(&mut self, dest: E, msg: M) -> ManagerResult {
