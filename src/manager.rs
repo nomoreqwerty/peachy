@@ -1,8 +1,6 @@
-use std::future::Future;
+use crate::routine::Routine;
 use tokio::task::JoinHandle;
-use crate::routines::Routine;
-
-pub type ManagerResult = Result<(), ManagerError>;
+use std::future::Future;
 
 /// **Manager** is responsible for running routines asynchronously
 /// 

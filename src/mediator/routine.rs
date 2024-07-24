@@ -1,12 +1,13 @@
+use crate::manager::ManagerResult;
+use crate::mediator::MediatorError;
+use crate::routine::Routine;
+
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::Arc;
 use dashmap::DashMap;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::mpsc::error::TryRecvError;
-use crate::manager::{ManagerError, ManagerResult};
-use crate::routines::Routine;
-
 /// **Mediator** is responsible for redirecting messages from routines to other routines.
 ///
 /// Every routine is connectable to **Mediator** with a [Connector](Connector).
@@ -37,6 +38,7 @@ use crate::routines::Routine;
 /// }
 ///
 /// impl Routine for SenderRoutine {
+///     type Err = NoErr;
 ///
 ///     async fn run(mut self) -> Result<(), Self::Err> {
 ///         self.con.send(AppRoute::ReceiverRoutine, AppEvent::ReceiverRoutine(ReceiverRoutineEvent::Print("Hello, World!".to_string()))).await?;
@@ -49,6 +51,7 @@ use crate::routines::Routine;
 /// }
 ///
 /// impl Routine for ReceiverRoutine {
+///     type Err = Error;
 ///
 ///     async fn run(mut self) -> Result<(), Self::Err> {
 ///         if let AppEvent::ReceiverRoutine(ReceiverRoutineEvent::Print(text)) = self.con.recv().await.unwrap() {
@@ -85,6 +88,7 @@ impl<E, M> Routine for Mediator<E, M>
     where E: Debug + Clone + Hash + PartialEq + Eq + Send + Sync + 'static,
           M: Clone + PartialEq + Send + Sync + 'static
 {
+    type Err = MediatorError<E>;
     
     async fn run(self) -> Result<(), Self::Err> {   
         loop {
