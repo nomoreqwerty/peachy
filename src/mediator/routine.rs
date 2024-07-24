@@ -56,18 +56,18 @@ use crate::routines::Routine;
 ///     }
 /// }
 ///
-/// #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// #[app_route]
 /// enum AppRoute {
 ///     SenderRoutine,
 ///     ReceiverRoutine,
 /// }
 ///
-/// #[derive(Clone, PartialEq)]
+/// #[app_event]
 /// enum AppEvent {
 ///     ReceiverRoutine(ReceiverRoutineEvent)
 /// }
 ///
-/// #[derive(Clone, PartialEq)]
+/// #[app_event]
 /// enum ReceiverRoutineEvent {
 ///     Print(String)
 /// }
