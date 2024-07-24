@@ -35,6 +35,12 @@ pub struct Manager {
     running_routines: Vec<JoinHandle<ManagerResult>>,
 }
 
+impl Default for Manager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Manager {
     pub fn new() -> Self {
         Self {
