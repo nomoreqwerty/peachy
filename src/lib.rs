@@ -11,4 +11,5 @@ pub mod prelude {
     pub use crate::manager::*;
     pub use crate::routine::*;
     pub use crate::derive::*;
+    pub use crate::error::NoErr;
 }

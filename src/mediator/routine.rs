@@ -18,6 +18,7 @@ use tokio::sync::mpsc::error::TryRecvError;
 /// ```
 /// use peachy::prelude::*;
 /// use peachy::mediator::*;
+/// use anyhow::Error;
 ///
 /// #[tokio::main]
 /// async fn main() -> ManagerResult {
