@@ -106,14 +106,15 @@ impl<E, M> Mediator<E, M>
         }
     }
 
-    async fn redirect(& self, to: E, message: M) -> ManagerResult {
+    async fn redirect(&self, to: E, message: Message<E, M>) -> Result<(), MediatorError<E>> {
         let connector = self.connectors.get_mut(&to).unwrap();
+        
+        let sourcepoint = message.source.clone();
+        let endpoint = to.clone();
 
-        connector
-            .tx
-            .send(MessagePoint { destination: to, message })
-            .await
-            .map_err(|error| ManagerError::Generic(error.into()))?;
+        connector.tx
+            .send(MessagePoint { destination: to, message }).await
+            .map_err(|_| MediatorError::ChannelClosed { from: sourcepoint, to: endpoint })?;
 
         Ok(())
     }
@@ -125,11 +126,13 @@ impl<E, M> Mediator<E, M>
         self
             .connectors
             .insert(source.clone(), Connector {
+                source: source.clone(),
                 tx: mediator_to_connector,
                 rx: mediator_from_connector,
             });
 
         Connector {
+            source,
             tx: connector_to_mediator,
             rx: connector_from_mediator,
         }
@@ -147,6 +150,7 @@ pub struct Connector<E, M>
     where E: Debug + Send + Sync + 'static,
           M: Send + Sync + 'static
 {
+    source: E,
     tx: Sender<MessagePoint<E, M>>,
     rx: Receiver<MessagePoint<E, M>>,
 }
@@ -157,23 +161,29 @@ impl<E, M> Connector<E, M>
 {
     #[inline]
     pub async fn send(&mut self, dest: E, msg: M) -> ManagerResult {
-        self
-            .tx
-            .send(MessagePoint { destination: dest, message: msg })
-            .await
-            .map_err(|error| ManagerError::Generic(error.into()))?;
+        self.tx
+            .send(MessagePoint { destination: dest.clone(), message: Message { source: self.source.clone(), message: msg } }).await
+            .map_err(|_| MediatorError::ChannelClosed { from: self.source.clone(), to: dest } )?;
 
         Ok(())
     }
 
     #[inline]
-    pub async fn recv(&mut self) -> Option<M> {
+    pub async fn recv(&mut self) -> Option<Message<E, M>> {
         self.rx.recv().await.map(|MessagePoint { destination: _, message }| message)
     }
+pub struct Message<E, M> 
+where E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
+      M: Clone + PartialEq + Send + Sync + 'static
+{
+    pub source: E,
+    pub message: M,
 }
 
 struct MessagePoint<E, M>
+where E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
+      M: Clone + PartialEq + Send + Sync + 'static
 {
     destination: E,
-    message: M
+    message: Message<E, M>
 }
