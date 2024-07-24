@@ -13,7 +13,7 @@ tokio = { version = "^1.39", features = ["rt-multi-thread", "macros", "sync"] }
 thiserror = "^1.0"
 anyhow = "^1.0"
 dashmap = "^6.0"
-derive = { path = "src/derive" }
+derive = { path = "src/derive", version = "0.1.0" }
 
 [features]
 mediator = []
