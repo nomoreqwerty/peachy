@@ -9,8 +9,8 @@ license = "MIT"
 description = "Peachy is a simple async task manager, similar to thread pool but cooler and for structs"
 
 [dependencies]
-tokio = { version = "1.38.0", features = ["rt-multi-thread", "macros", "sync"] }
-thiserror = "1.0.61"
-anyhow = "1.0.82"
-dashmap = "6.0.1"
+tokio = { version = "^1.39", features = ["rt-multi-thread", "macros", "sync"] }
+thiserror = "^1.0"
+anyhow = "^1.0"
+dashmap = "^6.0"
 derive = { path = "src/derive" }
