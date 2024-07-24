@@ -3,26 +3,31 @@ use tokio::task::JoinHandle;
 use std::future::Future;
 
 /// **Manager** is responsible for running routines asynchronously
-/// 
+///
+/// It creates a pool of asynchronous tasks for each routine and executes them simultaneously when *run()* is awaited
+///
+/// if any routine falls during execution, the entire program terminates
+///
 /// Every routine must implement [Routine] trait
 ///
 /// Example:
 /// ```
 /// use peachy::prelude::*;
-/// 
+///
 /// #[tokio::main]
-/// async fn main() {
+/// async fn main() -> anyhow::Result<()> {
 ///     Manager::new()
 ///         .add_routine(HelloWorldRoutine)
 ///         .run()
 ///         .await
-///         .unwrap();
 /// }
-/// 
+///
 /// struct HelloWorldRoutine;
-/// 
+///
 /// impl Routine for HelloWorldRoutine {
-///     async fn run(self) -> ManagerResult {
+///     type Err = None;
+///
+///     async fn run(self) -> Result<(), Self::Err> {
 ///         println!("Hello, World!");
 ///         Ok(())
 ///     }
