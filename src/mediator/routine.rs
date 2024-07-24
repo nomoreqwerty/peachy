@@ -180,6 +180,13 @@ impl<E, M> Connector<E, M>
     pub async fn recv(&mut self) -> Option<Message<E, M>> {
         self.rx.recv().await.map(|MessagePoint { destination: _, message }| message)
     }
+    
+    #[inline]
+    pub async fn try_recv(&mut self) -> Result<Message<E, M>, TryRecvError> {
+        self.rx.try_recv().map(|MessagePoint { destination: _, message }| message)
+    }
+}
+
 pub struct Message<E, M> 
 where E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
       M: Clone + PartialEq + Send + Sync + 'static
