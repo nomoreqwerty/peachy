@@ -3,11 +3,11 @@ use std::future::Future;
 pub trait Routine: Send + Sync + 'static {
     /// Error type of a routine. Can be any type that implements the [Error](std::error::Error) trait, and can also be individual
     /// for different routines
-    /// 
+    ///
     /// For a usage example check [Routine::run()](Routine::run) method
     type Err: Into<anyhow::Error> + Send + Sync + 'static;
 
-    /// The method that [Manager](crate::manager::Manager) will call when calling [Manager::run()](Manager::run) 
+    /// The method that [Manager](crate::manager::Manager) will call when calling [Manager::run()](Manager::run)
     ///
     /// **Example:**
     /// ```

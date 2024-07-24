@@ -2,12 +2,12 @@ use crate::manager::ManagerResult;
 use crate::mediator::MediatorError;
 use crate::routine::Routine;
 
+use dashmap::DashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::Arc;
-use dashmap::DashMap;
-use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::mpsc::error::TryRecvError;
+use tokio::sync::mpsc::{Receiver, Sender};
 /// **Mediator** is responsible for redirecting messages from routines to other routines.
 ///
 /// Every routine is connectable to **Mediator** with a [Connector](Connector).
@@ -79,25 +79,30 @@ use tokio::sync::mpsc::error::TryRecvError;
 /// }
 /// ```
 pub struct Mediator<E, M>
-    where E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
-          M: Clone + PartialEq + Send + Sync + 'static,
+where
+    E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
+    M: Clone + PartialEq + Send + Sync + 'static,
 {
     connectors: Arc<DashMap<E, Connector<E, M>>>,
 }
 
 impl<E, M> Routine for Mediator<E, M>
-    where E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
-          M: Clone + PartialEq + Send + Sync + 'static,
+where
+    E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
+    M: Clone + PartialEq + Send + Sync + 'static,
 {
     type Err = MediatorError<E>;
-    
+
     async fn run(self) -> Result<(), Self::Err> {
         loop {
             for mut connector in self.connectors.iter_mut() {
                 match connector.value_mut().rx.try_recv() {
-                    Ok(MessagePoint { destination, message }) => self.redirect(destination, message).await?,
+                    Ok(MessagePoint {
+                        destination,
+                        message,
+                    }) => self.redirect(destination, message).await?,
                     Err(TryRecvError::Empty) => continue,
-                    Err(TryRecvError::Disconnected) => return Ok(())
+                    Err(TryRecvError::Disconnected) => return Ok(()),
                 }
             }
         }
@@ -105,8 +110,9 @@ impl<E, M> Routine for Mediator<E, M>
 }
 
 impl<E, M> Mediator<E, M>
-    where E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
-          M: Clone + PartialEq + Send + Sync + 'static
+where
+    E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
+    M: Clone + PartialEq + Send + Sync + 'static,
 {
     pub fn new() -> Self {
         Self {
@@ -120,24 +126,33 @@ impl<E, M> Mediator<E, M>
         let sourcepoint = message.source.clone();
         let endpoint = to.clone();
 
-        connector.tx
-            .send(MessagePoint { destination: to, message }).await
-            .map_err(|_| MediatorError::ChannelClosed { from: sourcepoint, to: endpoint })?;
+        connector
+            .tx
+            .send(MessagePoint {
+                destination: to,
+                message,
+            })
+            .await
+            .map_err(|_| MediatorError::ChannelClosed {
+                from: sourcepoint,
+                to: endpoint,
+            })?;
 
         Ok(())
     }
-    
+
     pub async fn connect(&self, source: E) -> Connector<E, M> {
         let (mediator_to_connector, connector_from_mediator) = tokio::sync::mpsc::channel(32);
         let (connector_to_mediator, mediator_from_connector) = tokio::sync::mpsc::channel(32);
 
-        self
-            .connectors
-            .insert(source.clone(), Connector {
+        self.connectors.insert(
+            source.clone(),
+            Connector {
                 source: source.clone(),
                 tx: mediator_to_connector,
                 rx: mediator_from_connector,
-            });
+            },
+        );
 
         Connector {
             source,
@@ -148,15 +163,19 @@ impl<E, M> Mediator<E, M>
 }
 
 impl<E, M> Default for Mediator<E, M>
-    where E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
-          M: Clone + PartialEq + Send + Sync + 'static
+where
+    E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
+    M: Clone + PartialEq + Send + Sync + 'static,
 {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct Connector<E, M>
-    where E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
-          M: Clone + PartialEq + Send + Sync + 'static
+where
+    E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
+    M: Clone + PartialEq + Send + Sync + 'static,
 {
     source: E,
     tx: Sender<MessagePoint<E, M>>,
@@ -164,41 +183,64 @@ pub struct Connector<E, M>
 }
 
 impl<E, M> Connector<E, M>
-    where E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
-          M: Clone + PartialEq + Send + Sync + 'static
+where
+    E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
+    M: Clone + PartialEq + Send + Sync + 'static,
 {
     #[inline]
     pub async fn send(&mut self, dest: E, msg: M) -> ManagerResult {
         self.tx
-            .send(MessagePoint { destination: dest.clone(), message: Message { source: self.source.clone(), message: msg } }).await
-            .map_err(|_| MediatorError::ChannelClosed { from: self.source.clone(), to: dest } )?;
+            .send(MessagePoint {
+                destination: dest.clone(),
+                message: Message {
+                    source: self.source.clone(),
+                    message: msg,
+                },
+            })
+            .await
+            .map_err(|_| MediatorError::ChannelClosed {
+                from: self.source.clone(),
+                to: dest,
+            })?;
 
         Ok(())
     }
 
     #[inline]
     pub async fn recv(&mut self) -> Option<Message<E, M>> {
-        self.rx.recv().await.map(|MessagePoint { destination: _, message }| message)
+        self.rx.recv().await.map(
+            |MessagePoint {
+                 destination: _,
+                 message,
+             }| message,
+        )
     }
-    
+
     #[inline]
     pub async fn try_recv(&mut self) -> Result<Message<E, M>, TryRecvError> {
-        self.rx.try_recv().map(|MessagePoint { destination: _, message }| message)
+        self.rx.try_recv().map(
+            |MessagePoint {
+                 destination: _,
+                 message,
+             }| message,
+        )
     }
 }
 
-pub struct Message<E, M> 
-where E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
-      M: Clone + PartialEq + Send + Sync + 'static
+pub struct Message<E, M>
+where
+    E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
+    M: Clone + PartialEq + Send + Sync + 'static,
 {
     pub source: E,
     pub message: M,
 }
 
 struct MessagePoint<E, M>
-where E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
-      M: Clone + PartialEq + Send + Sync + 'static
+where
+    E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
+    M: Clone + PartialEq + Send + Sync + 'static,
 {
     destination: E,
-    message: Message<E, M>
+    message: Message<E, M>,
 }

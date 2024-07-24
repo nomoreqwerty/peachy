@@ -1,6 +1,6 @@
 use crate::routine::Routine;
-use tokio::task::JoinHandle;
 use std::future::Future;
+use tokio::task::JoinHandle;
 
 /// **Manager** is responsible for running routines asynchronously
 ///
@@ -33,7 +33,7 @@ use std::future::Future;
 ///     }
 /// }
 /// ```
-/// 
+///
 /// This program will execute method [run](Routine::run) of `HelloWorldRoutine` and print `Hello, World!`
 pub struct Manager {
     idle_routines: Vec<IdleRoutine>,
@@ -64,7 +64,8 @@ impl Manager {
         self.idle_routines.reverse();
 
         for idle_routine in self.idle_routines.drain(..) {
-            self.running_routines.push(tokio::spawn(Box::into_pin(idle_routine.0)));
+            self.running_routines
+                .push(tokio::spawn(Box::into_pin(idle_routine.0)));
         }
 
         Ok(())
@@ -72,18 +73,20 @@ impl Manager {
 
     #[inline]
     async fn join_routines(&mut self) -> ManagerResult {
-        for worker in self.running_routines.drain(..) { worker.await??; }
+        for worker in self.running_routines.drain(..) {
+            worker.await??;
+        }
         Ok(())
     }
-    
+
     /// Adds routine to [Manager].
-    /// 
+    ///
     /// A routine should implement [Routine] trait.
     ///
     /// For example refer to [Manager] docs
     pub fn add_routine(
         mut self,
-        routine: impl Routine<Err=impl Into<anyhow::Error> + Send + Sync + 'static>,
+        routine: impl Routine<Err = impl Into<anyhow::Error> + Send + Sync + 'static>,
     ) -> Self {
         self.idle_routines.push(IdleRoutine::new(routine)); // .run() is not awaited, so it's not running yet
         self
@@ -95,7 +98,9 @@ pub type ManagerResult = anyhow::Result<()>;
 struct IdleRoutine(Box<dyn Future<Output = Result<(), anyhow::Error>> + Send + Sync + 'static>);
 
 impl IdleRoutine {
-    fn new(routine: impl Routine<Err=impl Into<anyhow::Error> + Send + Sync + 'static>) -> Self {
-        Self(Box::new(async move { routine.run().await.map_err(Into::into) }))
+    fn new(routine: impl Routine<Err = impl Into<anyhow::Error> + Send + Sync + 'static>) -> Self {
+        Self(Box::new(
+            async move { routine.run().await.map_err(Into::into) },
+        ))
     }
 }

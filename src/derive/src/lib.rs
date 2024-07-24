@@ -7,7 +7,10 @@ extern crate syn;
 use proc_macro2::TokenStream;
 
 #[proc_macro_attribute]
-pub fn app_route(_metadata: proc_macro::TokenStream, input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn app_route(
+    _metadata: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
     let input: TokenStream = input.into();
     let output = quote! {
         #[derive(std::fmt::Debug, Clone, PartialEq, Eq, std::hash::Hash)]
@@ -17,7 +20,10 @@ pub fn app_route(_metadata: proc_macro::TokenStream, input: proc_macro::TokenStr
 }
 
 #[proc_macro_attribute]
-pub fn app_event(_metadata: proc_macro::TokenStream, input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn app_event(
+    _metadata: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
     let input: TokenStream = input.into();
     let output = quote! {
         #[derive(Clone, PartialEq)]
