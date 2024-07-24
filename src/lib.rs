@@ -1,5 +1,3 @@
-#![feature(type_alias_impl_trait)]
-
 pub mod manager;
 pub mod routine;
 pub mod error;

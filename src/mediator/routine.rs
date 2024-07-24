@@ -78,25 +78,25 @@ use tokio::sync::mpsc::error::TryRecvError;
 /// }
 /// ```
 pub struct Mediator<E, M>
-where E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
-      M: Clone + PartialEq + Send + Sync + 'static
+    where E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
+          M: Clone + PartialEq + Send + Sync + 'static,
 {
     connectors: Arc<DashMap<E, Connector<E, M>>>,
 }
 
 impl<E, M> Routine for Mediator<E, M>
-    where E: Debug + Clone + Hash + PartialEq + Eq + Send + Sync + 'static,
-          M: Clone + PartialEq + Send + Sync + 'static
+    where E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
+          M: Clone + PartialEq + Send + Sync + 'static,
 {
     type Err = MediatorError<E>;
     
-    async fn run(self) -> Result<(), Self::Err> {   
+    async fn run(self) -> Result<(), Self::Err> {
         loop {
             for mut connector in self.connectors.iter_mut() {
                 match connector.value_mut().rx.try_recv() {
-                    Ok(MessagePoint { destination: dest, message: msg }) => self.redirect(dest, msg).await?,
+                    Ok(MessagePoint { destination, message }) => self.redirect(destination, message).await?,
                     Err(TryRecvError::Empty) => continue,
-                    Err(TryRecvError::Disconnected) => return Ok(()),
+                    Err(TryRecvError::Disconnected) => return Ok(())
                 }
             }
         }
@@ -104,7 +104,7 @@ impl<E, M> Routine for Mediator<E, M>
 }
 
 impl<E, M> Mediator<E, M>
-    where E: Debug + Clone + Hash + PartialEq + Eq + Send + Sync + 'static,
+    where E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
           M: Clone + PartialEq + Send + Sync + 'static
 {
     pub fn new() -> Self {
@@ -115,7 +115,7 @@ impl<E, M> Mediator<E, M>
 
     async fn redirect(&self, to: E, message: Message<E, M>) -> Result<(), MediatorError<E>> {
         let connector = self.connectors.get_mut(&to).unwrap();
-        
+
         let sourcepoint = message.source.clone();
         let endpoint = to.clone();
 
@@ -147,15 +147,15 @@ impl<E, M> Mediator<E, M>
 }
 
 impl<E, M> Default for Mediator<E, M>
-    where E: Debug + Clone + Hash + PartialEq + Eq + Send + Sync + 'static,
+    where E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
           M: Clone + PartialEq + Send + Sync + 'static
 {
     fn default() -> Self { Self::new() }
 }
 
 pub struct Connector<E, M>
-    where E: Debug + Send + Sync + 'static,
-          M: Send + Sync + 'static
+    where E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
+          M: Clone + PartialEq + Send + Sync + 'static
 {
     source: E,
     tx: Sender<MessagePoint<E, M>>,
