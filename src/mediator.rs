@@ -73,7 +73,7 @@ use crate::routines::Routine;
 /// }
 /// ```
 pub struct Mediator<E, M>
-where E: Debug + Clone + Hash + PartialEq + Eq + Send + Sync + 'static,
+where E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
       M: Clone + PartialEq + Send + Sync + 'static
 {
     connectors: Arc<DashMap<E, Connector<E, M>>>,
