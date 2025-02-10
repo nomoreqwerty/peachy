@@ -1,13 +1,13 @@
 use crate::manager::ManagerResult;
 use crate::mediator::MediatorError;
 use crate::routine::Routine;
-
-use dashmap::DashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::Arc;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::Mutex;
+
 /// **Mediator** is responsible for redirecting messages from routines to other routines.
 ///
 /// Every routine is connectable to **Mediator** with a [Connector](Connector).
@@ -22,7 +22,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 ///
 /// #[tokio::main]
 /// async fn main() -> ManagerResult {
-///     let mediator = Mediator::new();
+///     let mut mediator = Mediator::new();
 ///
 ///     Manager::new()
 ///         .add_routine(SenderRoutine { con: mediator.connect(AppRoute::SenderRoutine).await })
@@ -83,8 +83,12 @@ where
     E: Debug + Clone + PartialEq + Eq + Hash + Send + Sync + 'static,
     M: Clone + PartialEq + Send + Sync + 'static,
 {
-    connectors: Arc<DashMap<E, Connector<E, M>>>,
+    receivers: Receivers<E, M>,
+    senders: Senders<E, M>,
 }
+
+type Receivers<E, M> = Vec<RecvTunnel<E, M>>;
+type Senders<E, M> = Arc<Mutex<Vec<SendTunnel<E, M>>>>;
 
 impl<E, M> Routine for Mediator<E, M>
 where
@@ -93,19 +97,22 @@ where
 {
     type Err = MediatorError<E>;
 
-    async fn run(self) -> Result<(), Self::Err> {
-        loop {
-            for mut connector in self.connectors.iter_mut() {
-                match connector.value_mut().rx.try_recv() {
-                    Ok(MessagePoint {
-                        destination,
-                        message,
-                    }) => self.redirect(destination, message).await?,
-                    Err(TryRecvError::Empty) => continue,
-                    Err(TryRecvError::Disconnected) => return Ok(()),
-                }
+    async fn run(mut self) -> Result<(), Self::Err> {
+        let mut handlers= Vec::with_capacity(self.receivers.len());
+
+        for receiver in self.receivers.drain(..) {
+            let redirect_task= tokio::spawn(Self::handle_messages(receiver, self.senders.clone()));
+            handlers.push(redirect_task);
+        }
+
+        for handle in handlers {
+            match handle.await {
+                Ok(result) => result?,
+                Err(error) => return Err(MediatorError::JoinHandleError(error)),
             }
         }
+
+        Ok(())
     }
 }
 
@@ -116,40 +123,59 @@ where
 {
     pub fn new() -> Self {
         Self {
-            connectors: Arc::new(DashMap::new()),
+            receivers: vec![],
+            senders: Arc::new(Mutex::new(vec![])),
         }
     }
 
-    async fn redirect(&self, to: E, message: Message<E, M>) -> Result<(), MediatorError<E>> {
-        let connector = self.connectors.get_mut(&to).unwrap();
+    async fn redirect(source: E, to: E, message: M, senders: Senders<E, M>) -> Result<(), MediatorError<E>> {
+        let senders = senders.lock().await;
+        
 
-        let sourcepoint = message.source.clone();
-        let endpoint = to.clone();
+        let tunnel = senders.iter()
+            .find(|&t| t.destination == to)
+            .ok_or(MediatorError::TargetUnreachable { target: to.clone() })?;
 
-        connector
+
+
+        tunnel
             .tx
             .send(MessagePoint {
-                destination: to,
-                message,
+                destination: to.clone(),
+                payload: Message { source: source.clone(), message },
             })
             .await
-            .map_err(|_| MediatorError::ChannelClosed {
-                from: sourcepoint,
-                to: endpoint,
-            })?;
+            .map_err(|_| MediatorError::ChannelClosed { from: source, to })?;
+
+
 
         Ok(())
     }
 
-    pub async fn connect(&self, source: E) -> Connector<E, M> {
+    async fn handle_messages(mut receiver: RecvTunnel<E, M>, send_tunnels: Senders<E, M>) -> Result<(), MediatorError<E>> {
+        while let Some(msg_point) = receiver.rx.recv().await {
+
+            Self::redirect(receiver.source.clone(), msg_point.destination, msg_point.payload.message, send_tunnels.clone()).await?;
+
+        }
+
+        Err(MediatorError::TargetUnreachable { target: receiver.source })
+    }
+
+    pub async fn connect(&mut self, source: E) -> Connector<E, M> {
         let (mediator_to_connector, connector_from_mediator) = tokio::sync::mpsc::channel(32);
         let (connector_to_mediator, mediator_from_connector) = tokio::sync::mpsc::channel(32);
 
-        self.connectors.insert(
-            source.clone(),
-            Connector {
-                source: source.clone(),
+        self.senders.lock().await.push(
+            SendTunnel {
+                destination: source.clone(),
                 tx: mediator_to_connector,
+            },
+        );
+        
+        self.receivers.push(
+            RecvTunnel {
+                source: source.clone(),
                 rx: mediator_from_connector,
             },
         );
@@ -192,7 +218,7 @@ where
         self.tx
             .send(MessagePoint {
                 destination: dest.clone(),
-                message: Message {
+                payload: Message {
                     source: self.source.clone(),
                     message: msg,
                 },
@@ -208,12 +234,7 @@ where
 
     #[inline]
     pub async fn recv(&mut self) -> Option<Message<E, M>> {
-        self.rx.recv().await.map(
-            |MessagePoint {
-                 destination: _,
-                 message,
-             }| message,
-        )
+        self.rx.recv().await.map(|MessagePoint { payload: message, .. }| message)
     }
 
     #[inline]
@@ -221,7 +242,7 @@ where
         self.rx.try_recv().map(
             |MessagePoint {
                  destination: _,
-                 message,
+                 payload: message,
              }| message,
         )
     }
@@ -236,11 +257,140 @@ where
     pub message: M,
 }
 
-struct MessagePoint<E, M>
+pub(crate) struct MessagePoint<E, M>
 where
     E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
     M: Clone + PartialEq + Send + Sync + 'static,
 {
-    destination: E,
-    message: Message<E, M>,
+    pub(crate) destination: E,
+    pub(crate) payload: Message<E, M>,
+}
+
+pub(crate) struct RecvTunnel<E, M>
+where
+    E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
+    M: Clone + PartialEq + Send + Sync + 'static,
+{
+    pub(crate) source: E,
+    pub(crate) rx: Receiver<MessagePoint<E, M>>,
+}
+
+pub(crate) struct SendTunnel<E, M>
+where
+    E: Debug + Clone + PartialEq + Eq + Send + Sync + 'static,
+    M: Clone + PartialEq + Send + Sync + 'static,
+{
+    pub(crate) destination: E,
+    pub(crate) tx: Sender<MessagePoint<E, M>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+    use derive::{app_event, app_route};
+    use tokio::sync::mpsc::Sender;
+    use crate::error::NoErr;
+    use crate::manager::Manager;
+    use super::*;
+
+    #[app_route]
+    enum TestAppRoute {
+        A,
+        B,
+    }
+
+    #[app_event]
+    enum TestAppEvent {
+        AEvent(AEvent),
+        BEvent(BEvent),
+    }
+
+    #[app_event]
+    enum AEvent {
+        Check(i32),
+    }
+
+    #[app_event]
+    enum BEvent {
+        Validate(i32),
+    }
+
+    struct ARoutine {
+        connector: Connector<TestAppRoute, TestAppEvent>,
+    }
+
+    impl Routine for ARoutine {
+        type Err = NoErr;
+
+        async fn run(mut self) -> Result<(), Self::Err> {
+            self.connector
+                .send(TestAppRoute::B, TestAppEvent::BEvent(BEvent::Validate(1)))
+                .await
+                .unwrap();
+            
+            self.connector
+                .send(TestAppRoute::B, TestAppEvent::BEvent(BEvent::Validate(2)))
+                .await
+                .unwrap();
+            
+            self.connector
+                .send(TestAppRoute::B, TestAppEvent::BEvent(BEvent::Validate(3)))
+                .await
+                .unwrap();
+            
+            self.connector
+                .send(TestAppRoute::B, TestAppEvent::BEvent(BEvent::Validate(4)))
+                .await
+                .unwrap();
+            
+            Ok(())
+        }
+    }
+
+    struct BRoutine {
+        connector: Connector<TestAppRoute, TestAppEvent>,
+        test_tx: Sender<i32>,
+    }
+
+    impl Routine for BRoutine {
+        type Err = NoErr;
+
+        async fn run(mut self) -> Result<(), Self::Err> {
+            while let Some(message) = self.connector.recv().await {
+                if let TestAppEvent::BEvent(BEvent::Validate(i)) = message.message {
+                    self.test_tx.send(i).await.unwrap();
+                }
+            }
+
+            Ok(())
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_mediator() {
+        let mut mediator = Mediator::new();
+
+        let (tx, rx) = tokio::sync::mpsc::channel(4);
+        
+        let a_routine = ARoutine {
+            connector: mediator.connect(TestAppRoute::A).await,
+        };
+        let b_routine = BRoutine {
+            connector: mediator.connect(TestAppRoute::B).await,
+            test_tx: tx
+        };
+
+        tokio::spawn(async move {
+            Manager::new()
+                .add_routine(a_routine)
+                .add_routine(b_routine)
+                .add_routine(mediator)
+                .run()
+                .await.unwrap();
+        });
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        assert_eq!(rx.len(), 4);
+    }
 }

@@ -1,7 +1,7 @@
 [package]
 name = "peachy"
 authors = ["nomoreqwerty <vlaadiolus@gmail.com>"]
-version = "1.1.0"
+version = "1.1.1"
 repository = "https://github.com/nomoreqwerty/peachy"
 homepage = "https://github.com/nomoreqwerty/peachy"
 edition = "2021"
@@ -9,10 +9,9 @@ license = "MIT"
 description = "Peachy is a simple async task manager, similar to thread pool but cooler and for structs"
 
 [dependencies]
-tokio = { version = "^1.39", features = ["rt-multi-thread", "macros", "sync"] }
+tokio = { version = "^1.39", features = ["rt-multi-thread", "macros", "sync", "time"] }
 thiserror = "^1.0"
 anyhow = "^1.0"
-dashmap = "^6.0"
 derive = { path = "src/derive", version = "0.1.0" }
 
 [features]

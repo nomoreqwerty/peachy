@@ -25,7 +25,7 @@ use tokio::task::JoinHandle;
 /// struct HelloWorldRoutine;
 ///
 /// impl Routine for HelloWorldRoutine {
-///     type Err = None;
+///     type Err = anyhow::Error;
 ///
 ///     async fn run(self) -> Result<(), Self::Err> {
 ///         println!("Hello, World!");

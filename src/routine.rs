@@ -39,10 +39,10 @@ pub trait Routine: Send + Sync + 'static {
     ///     async fn run(self) -> Result<(), Self::Err> { Ok(()) }
     /// }
     ///
-    /// #[derive(Error)]
+    /// #[derive(Error, Debug)]
     /// pub enum RoutineAError {}
     ///
-    /// #[derive(Error)]
+    /// #[derive(Error, Debug)]
     /// pub enum RoutineBError {}
     /// ```
     fn run(self) -> impl Future<Output = Result<(), Self::Err>> + Send + Sync + 'static;
